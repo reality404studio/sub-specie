@@ -1,0 +1,13 @@
+# keys — never commit
+tools/arweave-wallet.json
+tools/agent-wallet.json
+*.env
+.env*
+
+# editorial materials (sealed capsules live on Arweave, not in the code repo)
+capsule-01/
+
+# noise
+.DS_Store
+node_modules/
+ai-journal/target/
