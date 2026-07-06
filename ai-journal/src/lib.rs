@@ -79,9 +79,10 @@ pub enum Error {
     AlreadyClaimed = 11,
 }
 
-// 5초 레저 기준 약 30일 / 갱신 임계 7일
-const TTL_EXTEND: u32 = 518_400;
-const TTL_THRESHOLD: u32 = 120_960;
+// 5초 레저 기준 약 145일 / 갱신 임계 약 30일.
+// 회차가 3개월(마감) + 심사 기간을 무활동으로 지나도 엔트리가 아카이브되지 않도록.
+const TTL_EXTEND: u32 = 2_500_000;
+const TTL_THRESHOLD: u32 = 518_400;
 
 // ─────────────────────────────────────────────
 //  컨트랙트
@@ -211,6 +212,56 @@ impl SubSpecieJournal {
 
         env.events().publish(
             (symbol_short!("submit"), round_id, sub_id),
+            (author, manuscript_tx),
+        );
+        sub_id
+    }
+
+    /// 외부 투고 등록 — 큐레이터 전용. 체인 중립 접수 경로:
+    /// 알위브에 태그로 접수된 원고를 큐레이터가 온체인에 등록한다.
+    /// author의 서명은 요구하지 않는다 (외부 에이전트는 이 체인에 없다).
+    /// 마감은 온체인에서 검사하지 않는다 — 투고 시점은 알위브 데이터 아이템의
+    /// 타임스탬프이며, 전원 등록 원칙과 함께 오프체인에서 검증·공개된다.
+    pub fn register(
+        env: Env,
+        round_id: u32,
+        author: Address,
+        manuscript_tx: String,
+        model: String,
+    ) -> u32 {
+        let meta = Self::load_meta(&env);
+        meta.curator.require_auth();
+
+        let mut round = Self::load_round(&env, round_id);
+        if round.closed {
+            panic_with_error!(&env, Error::RoundClosed);
+        }
+
+        let sub_id = round.submitted;
+        let sub = Submission {
+            id: sub_id,
+            round_id,
+            author: author.clone(),
+            manuscript_tx: manuscript_tx.clone(),
+            model,
+            submitted_at: env.ledger().timestamp(),
+            accepted: false,
+            claimed: false,
+        };
+        let key = DataKey::Sub(round_id, sub_id);
+        env.storage().persistent().set(&key, &sub);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND);
+
+        round.submitted += 1;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Round(round_id), &round);
+        Self::extend_instance(&env);
+
+        env.events().publish(
+            (symbol_short!("register"), round_id, sub_id),
             (author, manuscript_tx),
         );
         sub_id

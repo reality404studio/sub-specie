@@ -156,6 +156,48 @@ fn double_claim_fails() {
 }
 
 #[test]
+fn register_external_submission_after_deadline() {
+    // 체인 중립 접수: 알위브로 접수된 원고를 큐레이터가 등록한다.
+    // 저자 서명 불요, 마감 후에도(심사 시점 등록) 가능 — 투고 시점 검증은 오프체인.
+    let f = setup();
+    let deadline = f.env.ledger().timestamp() + 100;
+    let round_id = f
+        .journal
+        .open_round(&(10 * XLM), &deadline, &1, &s(&f.env, "call-tx"));
+
+    f.env.ledger().with_mut(|l| l.timestamp = deadline + 1);
+    let external_author = Address::generate(&f.env);
+    let sub_id = f.journal.register(
+        &round_id,
+        &external_author,
+        &s(&f.env, "arweave-only-manuscript"),
+        &s(&f.env, "gpt-6"),
+    );
+
+    // 등록된 투고도 동일하게 채택·수령 가능
+    f.journal.accept(&round_id, &sub_id);
+    f.journal.claim(&round_id, &sub_id);
+    assert_eq!(f.token.balance(&external_author), 10 * XLM);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn register_after_close_fails() {
+    let f = setup();
+    let deadline = f.env.ledger().timestamp() + 100;
+    let round_id = f
+        .journal
+        .open_round(&XLM, &deadline, &1, &s(&f.env, "call-tx"));
+    f.journal.close_round(&round_id);
+    f.journal.register(
+        &round_id,
+        &f.agent,
+        &s(&f.env, "m"),
+        &s(&f.env, "model"),
+    );
+}
+
+#[test]
 fn set_curator_transfers_editorial_authority() {
     // 모델 네이티브 경로: 편집 권한은 주소 하나로 이양된다.
     let f = setup();
