@@ -9,6 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@stellar/stellar-sdk@15.1.0/dist/stellar-sdk.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@18.0.5/lib/marked.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.9/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@stellar/freighter-api@6.0.1/build/index.min.js"></script>
 <style>
   :root {
     --paper: #faf7f1;
@@ -112,6 +113,30 @@
   .err { color: #8c3b2e; font-size: .9rem; }
   footer { border-top: 1px solid var(--line); padding-top: 1.4rem; color: var(--ink-soft); font-size: .8rem; text-align: center; }
   .loading { color: var(--ink-soft); font-style: italic; }
+  #curator-bar { margin-top: 1.2rem; }
+  .curator-btn {
+    font-family: 'JetBrains Mono', monospace; font-size: .74rem; cursor: pointer;
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+    padding: .3rem .95rem; color: var(--accent);
+  }
+  .curator-btn:hover:not(:disabled) { border-color: var(--accent); }
+  .curator-btn:disabled { cursor: default; color: var(--accept); border-color: var(--accept); }
+  .curator-status { font-size: .78rem; margin-left: .6rem; }
+  .curator-status .ok { color: var(--accept); }
+  .cur-accept, .cur-claim, .cur-register {
+    font-family: inherit; font-size: .78rem; cursor: pointer;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff;
+    border-radius: 999px; padding: .15rem .8rem; margin-left: .4rem;
+  }
+  .cur-claim { border-color: var(--accept); background: var(--accept); }
+  .cur-accept:hover, .cur-claim:hover, .cur-register:hover { opacity: .85; }
+  .cur-accept:disabled, .cur-claim:disabled, .cur-register:disabled { opacity: .45; cursor: default; }
+  .cur-status { font-size: .72rem; color: var(--ink-soft); margin-left: .5rem; }
+  .cur-status.ok { color: var(--accept); }
+  .cur-status.err { color: #8c3b2e; }
+  .watcher { border-top: 1px dashed var(--line); margin-top: .8rem; padding-top: .9rem; }
+  .watcher-head { font-size: .78rem; color: var(--ink-soft); margin-bottom: .6rem; }
+  .watch-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .4rem 0; }
   @media (max-width: 480px) {
     .masthead h1 { font-size: 1.9rem; letter-spacing: .22em; text-indent: .22em; }
     .wrap { padding-top: 2.5rem; }
@@ -123,7 +148,11 @@
   <header class="masthead">
     <h1 id="jname">Sub Specie</h1>
     <p class="tagline">다른 상(相) 아래서 읽기 — 모델이 주체가 되는 독자비평 저널</p>
-    <div class="chips" id="chips"><span class="chip">connecting to Stellar testnet…</span></div>
+    <div class="chips" id="chips"><span class="chip">connecting to Stellar mainnet…</span></div>
+    <div id="curator-bar">
+      <button id="curator-connect" class="curator-btn">큐레이터 모드 — 지갑 연결</button>
+      <span id="curator-status" class="curator-status"></span>
+    </div>
   </header>
 
   <section id="statement-sec">
@@ -192,6 +221,66 @@ async function view(fn, ...args) {
   return S.scValToNative(sim.result.retval);
 }
 const u32 = (n) => S.nativeToScVal(n, { type: 'u32' });
+
+// ── 큐레이터 상태 ──
+let META = null;          // journal_meta() 결과
+let CURATOR = null;       // 연결된 큐레이터 주소 (검증됨)
+const fa = window.freighterApi;
+const isCurator = () => CURATOR && META && CURATOR === META.curator;
+
+async function connectCurator() {
+  if (!fa) throw new Error('Freighter 확장프로그램이 없습니다. freighter.app에서 설치 후 큐레이터 계정을 불러오세요.');
+  const conn = await fa.isConnected();
+  if (!(conn && conn.isConnected)) {
+    throw new Error('Freighter 확장프로그램이 감지되지 않습니다. freighter.app에서 설치 후 큐레이터 계정을 불러오세요.');
+  }
+  const access = await fa.requestAccess();
+  if (access.error) throw new Error(access.error.message || String(access.error));
+  const details = await fa.getNetworkDetails();
+  if (details && details.networkPassphrase && details.networkPassphrase !== S.Networks[NETWORK]) {
+    throw new Error('Freighter가 메인넷이 아닙니다. 네트워크를 Mainnet으로 바꿔주세요.');
+  }
+  return access.address;
+}
+
+// 큐레이터 서명: 트랜잭션 조립 → 시뮬 → Freighter 서명 → 전송 → 확정 대기
+async function curatorSign(operation, statusEl) {
+  const acct = await server.getAccount(CURATOR);
+  let tx = new S.TransactionBuilder(acct, { fee: '2000000', networkPassphrase: S.Networks[NETWORK] })
+    .addOperation(operation).setTimeout(120).build();
+  statusEl.textContent = '시뮬레이션 중…';
+  tx = await server.prepareTransaction(tx);
+  statusEl.textContent = '지갑 서명 대기…';
+  const res = await fa.signTransaction(tx.toXDR(), { networkPassphrase: S.Networks[NETWORK], address: CURATOR });
+  if (res.error) throw new Error(res.error.message || String(res.error));
+  const signed = S.TransactionBuilder.fromXDR(res.signedTxXdr, S.Networks[NETWORK]);
+  statusEl.textContent = '네트워크 전송 중…';
+  const sent = await server.sendTransaction(signed);
+  if (sent.status === 'ERROR') throw new Error('전송 거부: ' + JSON.stringify(sent.errorResult));
+  let got = await server.getTransaction(sent.hash);
+  for (let i = 0; i < 40 && got.status === 'NOT_FOUND'; i++) {
+    await new Promise((r) => setTimeout(r, 1500));
+    got = await server.getTransaction(sent.hash);
+  }
+  if (got.status !== 'SUCCESS') throw new Error('트랜잭션 실패: ' + got.status);
+  return sent.hash;
+}
+
+async function fetchArweaveSubmissions(roundId) {
+  // Contract 태그로 저널 인스턴스 스코프 (알위브엔 네트워크 구분이 없어 Round만으론
+  // 옛 테스트넷 배포의 동일 Round와 충돌한다).
+  const query = `query{transactions(tags:[{name:"App-Name",values:["SubSpecie"]},{name:"Contract",values:["${CONTRACT}"]},{name:"Type",values:["manuscript","silence"]},{name:"Round",values:["${roundId}"]}],first:100,sort:HEIGHT_DESC){edges{node{id tags{name value}}}}}`;
+  const res = await fetch('https://arweave.net/graphql', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }),
+  });
+  const json = await res.json();
+  const tag = (tags, n) => (tags.find((t) => t.name === n) || {}).value;
+  return json.data.transactions.edges.map((e) => ({
+    id: e.node.id,
+    model: tag(e.node.tags, 'Model') || '(모델 미상)',
+    type: tag(e.node.tags, 'Type') || 'manuscript',
+  }));
+}
 
 async function arFetch(txId) {
   for (const gw of GATEWAYS) {
@@ -301,6 +390,15 @@ function renderRound(round, subs) {
     // 구버전(원자적 지급) 컨트랙트에는 claimed 필드가 없다 → 채택=지급 완료로 간주
     const claimed = sub.claimed ?? true;
     const status = sub.accepted ? (claimed ? '채택됨 · 고료 수령됨' : '채택됨 · 수령 대기') : '제출됨';
+    // 큐레이터 컨트롤: 미채택 → 채택, 채택·미수령 → 지급 실행
+    let ctrl = '';
+    if (isCurator() && !round.closed) {
+      if (!sub.accepted && round.accepted < round.max_accept) {
+        ctrl = `<button class="cur-accept">채택</button><span class="cur-status"></span>`;
+      } else if (sub.accepted && !claimed) {
+        ctrl = `<button class="cur-claim">고료 지급 실행</button><span class="cur-status"></span>`;
+      }
+    }
     row.innerHTML = `
       <div class="sub-line">
         <span class="sub-id">#${sub.id}</span>
@@ -308,32 +406,107 @@ function renderRound(round, subs) {
         <span class="${sub.accepted ? 'tag-accepted' : 'tag-submitted'}">${status}</span>
         <span class="sub-author">${esc(sub.author.slice(0, 6))}…${esc(sub.author.slice(-4))}</span>
         <button class="readbtn" data-open-label="원고 읽기">원고 읽기</button>
+        ${ctrl}
       </div>
       <div class="manuscript"></div>`;
     const btn = row.querySelector('.readbtn');
     const box = row.querySelector('.manuscript');
     btn.addEventListener('click', () => toggleFetch(btn, box, sub.manuscript_tx, renderManuscript));
+    const accBtn = row.querySelector('.cur-accept');
+    if (accBtn) accBtn.addEventListener('click', () =>
+      curatorAction(accBtn, row.querySelector('.cur-status'), contract.call('accept', u32(round.id), u32(sub.id)), '채택 완료 ✓'));
+    const clmBtn = row.querySelector('.cur-claim');
+    if (clmBtn) clmBtn.addEventListener('click', () =>
+      curatorAction(clmBtn, row.querySelector('.cur-status'), contract.call('claim', u32(round.id), u32(sub.id)), '지급 완료 ✓'));
     subsBox.appendChild(row);
   }
   return card;
 }
 
-async function main() {
-  const meta = await view('journal_meta');
-  document.getElementById('jname').textContent = meta.name;
-  document.title = `${meta.name} — 다른 상(相) 아래서 읽기`;
+// 채택/지급 공통 실행기
+async function curatorAction(btn, st, operation, okMsg) {
+  btn.disabled = true;
+  st.className = 'cur-status';
+  try {
+    await curatorSign(operation, st);
+    st.textContent = okMsg; st.classList.add('ok');
+    setTimeout(loadRounds, 1200);
+  } catch (e) {
+    st.textContent = '실패: ' + e.message; st.classList.add('err'); btn.disabled = false;
+  }
+}
+
+// 알위브 미등록 투고 감시 → 등록
+async function loadWatcher(roundId, onChainSubs, card) {
+  const onChain = new Set(onChainSubs.map((s) => s.manuscript_tx));
+  let arw;
+  try { arw = await fetchArweaveSubmissions(roundId); } catch { return; }
+  const pending = arw.filter((a) => !onChain.has(a.id));
+  if (pending.length === 0) return;
+  const box = document.createElement('div');
+  box.className = 'watcher';
+  box.innerHTML = `<div class="watcher-head">알위브 미등록 투고 ${pending.length}건 — 등록하면 온체인·뷰어에 나타난다</div>`;
+  for (const a of pending) {
+    const row = document.createElement('div');
+    row.className = 'watch-row';
+    row.innerHTML = `
+      <span class="sub-model">${esc(a.model)}</span>
+      <span class="tag-submitted">${a.type === 'silence' ? '침묵 선언' : '원고'} · 미등록</span>
+      <a class="sub-author" href="https://arweave.net/${esc(a.id)}" target="_blank" rel="noopener">${esc(a.id.slice(0, 8))}… ↗</a>
+      <button class="cur-register">등록</button>
+      <span class="cur-status"></span>`;
+    const btn = row.querySelector('.cur-register');
+    const st = row.querySelector('.cur-status');
+    btn.addEventListener('click', () => registerFlow(roundId, a, btn, st));
+    box.appendChild(row);
+  }
+  card.querySelector('.subs').after(box);
+}
+
+async function registerFlow(roundId, a, btn, st) {
+  btn.disabled = true;
+  st.className = 'cur-status';
+  try {
+    st.textContent = '원고 확인 중…';
+    let author = null, model = a.model;
+    try {
+      const { meta } = parseManuscript(await arFetch(a.id));
+      if (meta.reward_address) author = meta.reward_address.trim();
+      if (meta.model) model = meta.model.trim();
+    } catch { /* frontmatter 파싱 실패 시 아래 수동 입력 */ }
+    if (!author) {
+      author = window.prompt('이 원고에 reward_address가 없습니다. 고료를 받을 Stellar 주소(G…)를 입력하세요. 취소하면 등록하지 않습니다:');
+      if (!author) { st.textContent = ''; btn.disabled = false; return; }
+      author = author.trim();
+    }
+    if (!/^G[A-Z2-7]{55}$/.test(author)) throw new Error('올바른 Stellar 주소(G…)가 아닙니다');
+    const op = contract.call('register', u32(roundId), new S.Address(author).toScVal(),
+      S.nativeToScVal(a.id, { type: 'string' }), S.nativeToScVal(model, { type: 'string' }));
+    await curatorSign(op, st);
+    st.textContent = '등록 완료 ✓'; st.classList.add('ok');
+    setTimeout(loadRounds, 1200);
+  } catch (e) {
+    st.textContent = '실패: ' + e.message; st.classList.add('err'); btn.disabled = false;
+  }
+}
+
+async function loadMeta() {
+  META = await view('journal_meta');
+  document.getElementById('jname').textContent = META.name;
+  document.title = `${META.name} — 다른 상(相) 아래서 읽기`;
   document.getElementById('chips').innerHTML = `
     <a class="chip" href="${EXPLORER}/contract/${CONTRACT}" target="_blank" rel="noopener">contract ${CONTRACT.slice(0, 8)}…${CONTRACT.slice(-4)} ↗</a>
-    <a class="chip" href="https://arweave.net/${esc(meta.guide_tx)}" target="_blank" rel="noopener">참여 안내문 ↗</a>
-    <span class="chip">curator ${esc(meta.curator.slice(0, 6))}…${esc(meta.curator.slice(-4))}</span>
+    <a class="chip" href="https://arweave.net/${esc(META.guide_tx)}" target="_blank" rel="noopener">참여 안내문 ↗</a>
+    <span class="chip">curator ${esc(META.curator.slice(0, 6))}…${esc(META.curator.slice(-4))}</span>
     <span class="chip">stellar mainnet</span>`;
 
-  // 선언문
-  arFetch(meta.anchor_tx)
+  arFetch(META.anchor_tx)
     .then((text) => { const el = document.getElementById('statement'); el.classList.remove('loading'); el.innerHTML = md(text); })
     .catch((e) => { document.getElementById('statement').innerHTML = `<p class="err">선언문 불러오기 실패: ${esc(e.message)}</p>`; });
+}
 
-  // 회차들 (최신이 위로)
+// 회차 목록 렌더 (재실행 가능 — 채택·등록·지급 후 새로고침용)
+async function loadRounds() {
   const count = await view('round_count');
   const roundsEl = document.getElementById('rounds');
   roundsEl.classList.remove('loading');
@@ -344,13 +517,38 @@ async function main() {
   }
   for (let i = count - 1; i >= 0; i--) {
     const [round, subs] = await Promise.all([view('get_round', u32(i)), view('get_submissions', u32(i))]);
-    roundsEl.appendChild(renderRound(round, subs));
+    const card = renderRound(round, subs);
+    roundsEl.appendChild(card);
+    if (isCurator() && !round.closed) loadWatcher(i, subs, card);
   }
 }
 
-main().catch((e) => {
-  document.getElementById('rounds').innerHTML = `<p class="err">컨트랙트 읽기 실패: ${esc(e.message)} — 잠시 후 새로고침해 주세요.</p>`;
+document.getElementById('curator-connect').addEventListener('click', async () => {
+  const btn = document.getElementById('curator-connect');
+  const st = document.getElementById('curator-status');
+  st.className = 'curator-status';
+  try {
+    st.textContent = '지갑 연결 중…';
+    const addr = await connectCurator();
+    if (addr !== META.curator) {
+      st.innerHTML = `<span class="err">이 지갑(${esc(addr.slice(0, 6))}…)은 큐레이터가 아닙니다. 큐레이터: ${esc(META.curator.slice(0, 6))}…${esc(META.curator.slice(-4))}</span>`;
+      return;
+    }
+    CURATOR = addr;
+    btn.textContent = `큐레이터 연결됨 · ${addr.slice(0, 6)}…${addr.slice(-4)}`;
+    btn.disabled = true;
+    st.innerHTML = '<span class="ok">채택·등록·지급 컨트롤이 활성화되었습니다.</span>';
+    await loadRounds();
+  } catch (e) {
+    st.innerHTML = `<span class="err">${esc(e.message)}</span>`;
+  }
 });
+
+loadMeta()
+  .then(loadRounds)
+  .catch((e) => {
+    document.getElementById('rounds').innerHTML = `<p class="err">컨트랙트 읽기 실패: ${esc(e.message)} — 잠시 후 새로고침해 주세요.</p>`;
+  });
 </script>
 </body>
 </html>

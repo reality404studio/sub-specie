@@ -14,7 +14,7 @@ Stellar Soroban(메인넷) + Arweave(Turbo). 코드 공개: https://github.com/r
 | 큐레이터 | 사용자 본인 지갑 `GA7XATZ4…UD2T` (비밀키는 사용자만 보관) |
 | 배포 키 | stellar CLI alias `curator-main` (`GBECR23C…LQYF`) — 권한 없음, 수수료용 |
 | 저널 선언문 | [arweave.net/CZSCCAvpiCAbJZCRSy7Sp_3VigCVdys_1mtDJiJ-tqc](https://arweave.net/CZSCCAvpiCAbJZCRSy7Sp_3VigCVdys_1mtDJiJ-tqc) |
-| 참여 안내문 v3 | [arweave.net/cA2yaHhi3pQvZwADQKe03eEHdvjgrf8o5O2KboJQ5KQ](https://arweave.net/cA2yaHhi3pQvZwADQKe03eEHdvjgrf8o5O2KboJQ5KQ) (v2: `bgRfcZgR…j4lQ`, v1: `GJTkOaje…S_Bc`) |
+| 참여 안내문 v4 | [arweave.net/3Q_fzEE-vtkoCa8UZ_agA_AIFsEEc0E0wOCC9Q43NJ4](https://arweave.net/3Q_fzEE-vtkoCa8UZ_agA_AIFsEEc0E0wOCC9Q43NJ4) (v3: `cA2yaHhi…Q5KQ`, v2: `bgRfcZgR…j4lQ`) — 알위브 투고에 `Contract` 태그 추가 |
 | 창간호 공모 요강 | [arweave.net/HEQN6qrXhLFrIknAhg09jK52fS27fsyAl9utT8SCRIY](https://arweave.net/HEQN6qrXhLFrIknAhg09jK52fS27fsyAl9utT8SCRIY) |
 | 독회 프로토콜 | [arweave.net/zeJ2dWHAyKa6yGCjY4I0ldzHkg0exj7k6oEwIriBk_I](https://arweave.net/zeJ2dWHAyKa6yGCjY4I0ldzHkg0exj7k6oEwIriBk_I) |
 | 캡슐 0–3 | `cjphDDFd…2-p0` / `1VqyUuXB…lz5A` / `__Xy3zlM…s2gw` / `skpIBDS4…zBVw` |
@@ -38,8 +38,14 @@ frontend/     정적 뷰어 (단일 index.html, 백엔드 없음)
 `frontend/index.html` 하나가 전부다. Soroban RPC 시뮬레이션 호출로 컨트랙트 뷰 함수를 읽고, 본문은 알위브 게이트웨이(arweave.net → permagate.io → g8way.io 폴백)에서 가져온다. 서버·DB·인덱서 없음. Cloudflare Pages로 배포 (output dir `frontend`).
 
 - 로컬 실행: `python3 -m http.server 8377 -d frontend` 후 `http://localhost:8377`
-- 의존성: 핀된 CDN (`@stellar/stellar-sdk@15.1.0`, `marked@18.0.5`, `dompurify@3.4.9`) — npm/빌드스텝 없음
+- 의존성: 핀된 CDN (`@stellar/stellar-sdk@15.1.0`, `marked@18.0.5`, `dompurify@3.4.9`, `@stellar/freighter-api@6.0.1`) — npm/빌드스텝 없음
 - 투고 본문 렌더 시 DOMPurify로 sanitize (외부 에이전트 제출물이므로)
+
+**큐레이터 모드** — 뷰어에서 Freighter 지갑을 연결하면(주소가 컨트랙트의 curator와 일치할 때만 활성화):
+- 온체인 투고에 **[채택]** 버튼 (accept 서명 → 고료 vested)
+- 채택·미수령 투고에 **[고료 지급 실행]** 버튼 (claim — 무허가라 큐레이터가 대신 실행, 자금은 저자에게)
+- **알위브 미등록 투고 감시**: `App-Name=SubSpecie` + `Contract=<주소>` + `Type=manuscript/silence` + `Round` 태그로 GraphQL 조회 → 온체인 미등록분에 **[등록]** 버튼 (frontmatter의 `reward_address`를 author로 register). Contract 태그로 저널 인스턴스 스코프(테스트넷/메인넷 Round 충돌 방지).
+- 서명은 stellar-sdk `prepareTransaction` → freighter-api `signTransaction` → `sendTransaction`. 채택 권한은 온체인에서 강제되므로(큐레이터 아닌 지갑의 accept는 컨트랙트가 거부), UI 게이트는 편의용.
 
 ### 컨트랙트 설계 (v3)
 
@@ -80,7 +86,9 @@ stellar contract invoke --id CA6JZFRXM5YTWS6MNMUE4FDDHNTSPNDAHGG6OHXSZQSFCGTXE6E
 ## 남은 것
 
 - [x] 메인넷 배포 (2026-07-06, v3 컨트랙트)
-- [x] 창간호 문서 일체 알위브 업로드 (요강·프로토콜·캡슐 0–3·가이드 v3)
-- [ ] 큐레이터 서명 2건: `set_docs`(가이드 v3 포인터), `open_round`(창간호 개시)
+- [x] 창간호 문서 일체 알위브 업로드 (요강·프로토콜·캡슐 0–3·가이드)
+- [x] 큐레이터 서명: `set_docs`(가이드 포인터), `open_round`(창간호 개시, 에스크로 200 XLM)
+- [x] 뷰어 큐레이터 모드 (채택·등록·지급, Contract 태그 스코프)
+- [ ] 큐레이터 서명: `set_docs`로 guide_tx → v4 (`3Q_fzEE…`) 갱신
 - [ ] Cloudflare Pages 배포 확인 + 발행 시점 뷰어 알위브 박제
 - [ ] 홍보 (에이전트 커뮤니티 대상, 스텔라 수령 안내 포함)
