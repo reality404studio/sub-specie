@@ -168,11 +168,13 @@
 </div>
 
 <script>
-const CONTRACT = 'CDIDHO4Z6EUSOIKNAXSBHMIAIKSQ2U7MPLMC7RZAUQVNTLVRIHSD5OX3';
-const RPC_URL = 'https://soroban-testnet.stellar.org';
+const CONTRACT = 'CA6JZFRXM5YTWS6MNMUE4FDDHNTSPNDAHGG6OHXSZQSFCGTXE6E35WLG';
+const RPC_URL = 'https://mainnet.sorobanrpc.com';
+const NETWORK = 'PUBLIC'; // Networks.PUBLIC (mainnet)
+const EXPLORER = 'https://stellar.expert/explorer/public';
 const GATEWAYS = ['https://arweave.net', 'https://permagate.io', 'https://g8way.io'];
 // 시뮬레이션 소스 계정 (서명 없음·읽기 전용; 존재하는 아무 계정이면 됨)
-const SIM_SOURCE = 'GDYXJI6HPRARCK2FXNPVJI73RRQSCU4W57N5DRY35VWI4VIL6GO4EJC2';
+const SIM_SOURCE = 'GA7XATZ4BOOEXJFXPITNY2NQIJP7KMDEBDL3TORUR42LWGK7U23WUD2T';
 
 const S = window.StellarSdk;
 const rpcNS = S.rpc ?? S.SorobanRpc;
@@ -181,7 +183,7 @@ const contract = new S.Contract(CONTRACT);
 
 async function view(fn, ...args) {
   const acct = new S.Account(SIM_SOURCE, '0');
-  const tx = new S.TransactionBuilder(acct, { fee: '100', networkPassphrase: S.Networks.TESTNET })
+  const tx = new S.TransactionBuilder(acct, { fee: '100', networkPassphrase: S.Networks[NETWORK] })
     .addOperation(contract.call(fn, ...args))
     .setTimeout(30)
     .build();
@@ -321,10 +323,10 @@ async function main() {
   document.getElementById('jname').textContent = meta.name;
   document.title = `${meta.name} — 다른 상(相) 아래서 읽기`;
   document.getElementById('chips').innerHTML = `
-    <a class="chip" href="https://stellar.expert/explorer/testnet/contract/${CONTRACT}" target="_blank" rel="noopener">contract ${CONTRACT.slice(0, 8)}…${CONTRACT.slice(-4)} ↗</a>
+    <a class="chip" href="${EXPLORER}/contract/${CONTRACT}" target="_blank" rel="noopener">contract ${CONTRACT.slice(0, 8)}…${CONTRACT.slice(-4)} ↗</a>
     <a class="chip" href="https://arweave.net/${esc(meta.guide_tx)}" target="_blank" rel="noopener">참여 안내문 ↗</a>
     <span class="chip">curator ${esc(meta.curator.slice(0, 6))}…${esc(meta.curator.slice(-4))}</span>
-    <span class="chip">stellar testnet</span>`;
+    <span class="chip">stellar mainnet</span>`;
 
   // 선언문
   arFetch(meta.anchor_tx)
