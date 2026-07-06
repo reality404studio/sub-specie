@@ -33,7 +33,8 @@ pub struct Round {
     pub max_accept: u32, // 최대 채택 편수
     pub accepted: u32,
     pub submitted: u32,
-    pub escrow: i128,    // 이 회차에 남은 에스크로 잔액
+    pub escrow: i128,    // 미채택분 에스크로 잔액 (종료 시 큐레이터 환급분)
+    pub vested: i128,    // 채택으로 확정됐으나 아직 수령되지 않은 금액 (환급 불가)
     pub call_tx: String, // 공모 요강 Arweave TX
     pub closed: bool,
 }
@@ -50,6 +51,7 @@ pub struct Submission {
     pub model: String,         // 자기 신고 모델 식별자
     pub submitted_at: u64,
     pub accepted: bool,
+    pub claimed: bool, // 고료 수령 완료 여부
 }
 
 #[contracttype]
@@ -73,6 +75,8 @@ pub enum Error {
     SubmissionNotFound = 7,
     AlreadyAccepted = 8,
     InsufficientEscrow = 9,
+    NotAccepted = 10,
+    AlreadyClaimed = 11,
 }
 
 // 5초 레저 기준 약 30일 / 갱신 임계 7일
@@ -147,6 +151,7 @@ impl SubSpecieJournal {
             accepted: 0,
             submitted: 0,
             escrow: total,
+            vested: 0,
             call_tx,
             closed: false,
         };
@@ -190,6 +195,7 @@ impl SubSpecieJournal {
             model,
             submitted_at: env.ledger().timestamp(),
             accepted: false,
+            claimed: false,
         };
         let key = DataKey::Sub(round_id, sub_id);
         env.storage().persistent().set(&key, &sub);
@@ -210,7 +216,9 @@ impl SubSpecieJournal {
         sub_id
     }
 
-    /// 채택 — 큐레이터 전용. 에스크로에서 저자에게 고료 즉시 전송.
+    /// 채택 — 큐레이터 전용. 편집 행위다: 채택을 표시하고 고료 수령권을
+    /// 확정한다(에스크로 → vested). 전송은 하지 않는다 — 수령은 claim으로,
+    /// 채택 이후 누구도(큐레이터도) 지급을 막거나 되돌릴 수 없다.
     pub fn accept(env: Env, round_id: u32, sub_id: u32) {
         let meta = Self::load_meta(&env);
         meta.curator.require_auth();
@@ -236,15 +244,10 @@ impl SubSpecieJournal {
             panic_with_error!(&env, Error::AlreadyAccepted);
         }
 
-        token::Client::new(&env, &meta.token).transfer(
-            &env.current_contract_address(),
-            &sub.author,
-            &round.reward,
-        );
-
         sub.accepted = true;
         round.accepted += 1;
         round.escrow -= round.reward;
+        round.vested += round.reward;
         env.storage().persistent().set(&key, &sub);
         env.storage()
             .persistent()
@@ -257,7 +260,61 @@ impl SubSpecieJournal {
         );
     }
 
-    /// 회차 종료 — 큐레이터 전용. 잔여 에스크로 환급. 이후 투고/채택 불가.
+    /// 고료 수령 — 무허가. 채택으로 확정된 수령권의 행사이며 승인이 아니다.
+    /// 누가 호출하든 자금은 투고에 기록된 author 주소로만 간다.
+    /// 회차 종료 후에도 유효하다.
+    pub fn claim(env: Env, round_id: u32, sub_id: u32) {
+        let meta = Self::load_meta(&env);
+        let mut round = Self::load_round(&env, round_id);
+
+        let key = DataKey::Sub(round_id, sub_id);
+        let mut sub: Submission = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::SubmissionNotFound));
+        if !sub.accepted {
+            panic_with_error!(&env, Error::NotAccepted);
+        }
+        if sub.claimed {
+            panic_with_error!(&env, Error::AlreadyClaimed);
+        }
+
+        token::Client::new(&env, &meta.token).transfer(
+            &env.current_contract_address(),
+            &sub.author,
+            &round.reward,
+        );
+
+        sub.claimed = true;
+        round.vested -= round.reward;
+        env.storage().persistent().set(&key, &sub);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Round(round_id), &round);
+        Self::extend_instance(&env);
+
+        env.events().publish(
+            (symbol_short!("claim"), round_id, sub_id),
+            (sub.author, round.reward),
+        );
+    }
+
+    /// 큐레이터(편집 권한) 이양 — 현 큐레이터 전용.
+    /// 모델 네이티브 저널로 가는 경로: 편집 권한을 모델의 주소로 넘길 수 있다.
+    pub fn set_curator(env: Env, new_curator: Address) {
+        let mut meta = Self::load_meta(&env);
+        meta.curator.require_auth();
+        meta.curator = new_curator.clone();
+        env.storage().instance().set(&DataKey::Meta, &meta);
+        Self::extend_instance(&env);
+
+        env.events()
+            .publish((symbol_short!("curator"),), new_curator);
+    }
+
+    /// 회차 종료 — 큐레이터 전용. 미채택분 에스크로만 환급된다.
+    /// 채택으로 확정된 수령권(vested)은 종료와 무관하게 남는다. 이후 투고/채택 불가.
     pub fn close_round(env: Env, round_id: u32) {
         let meta = Self::load_meta(&env);
         meta.curator.require_auth();

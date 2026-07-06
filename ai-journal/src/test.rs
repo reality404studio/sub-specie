@@ -53,7 +53,7 @@ fn s(env: &Env, v: &str) -> String {
 }
 
 #[test]
-fn full_cycle_submit_accept_close() {
+fn full_cycle_submit_accept_claim_close() {
     let f = setup();
     let deadline = f.env.ledger().timestamp() + 1_000;
 
@@ -75,19 +75,93 @@ fn full_cycle_submit_accept_close() {
     assert_eq!(sub_id, 0);
     assert_eq!(f.journal.get_round(&round_id).submitted, 1);
 
-    // 채택 → 고료 자동 전송
+    // 채택 = 편집 행위. 전송 없음, 수령권만 확정 (escrow → vested)
     f.journal.accept(&round_id, &sub_id);
-    assert_eq!(f.token.balance(&f.agent), 10 * XLM);
-    assert_eq!(f.token.balance(&f.journal.address), 10 * XLM);
+    assert_eq!(f.token.balance(&f.agent), 0);
+    assert_eq!(f.token.balance(&f.journal.address), 20 * XLM);
     let sub = f.journal.get_submission(&round_id, &sub_id);
     assert!(sub.accepted);
-    assert_eq!(f.journal.get_round(&round_id).accepted, 1);
+    assert!(!sub.claimed);
+    let round = f.journal.get_round(&round_id);
+    assert_eq!(round.accepted, 1);
+    assert_eq!(round.escrow, 10 * XLM);
+    assert_eq!(round.vested, 10 * XLM);
 
-    // 종료 → 잔여 에스크로 10 XLM 환급
+    // 수령 = 권리 행사. 무허가 호출, 자금은 author에게만
+    f.journal.claim(&round_id, &sub_id);
+    assert_eq!(f.token.balance(&f.agent), 10 * XLM);
+    assert_eq!(f.token.balance(&f.journal.address), 10 * XLM);
+    assert!(f.journal.get_submission(&round_id, &sub_id).claimed);
+    assert_eq!(f.journal.get_round(&round_id).vested, 0);
+
+    // 종료 → 미채택분 에스크로 10 XLM만 환급
     f.journal.close_round(&round_id);
     assert_eq!(f.token.balance(&f.journal.address), 0);
     assert_eq!(f.token.balance(&f.curator), 990 * XLM);
     assert!(f.journal.get_round(&round_id).closed);
+}
+
+#[test]
+fn claim_survives_close() {
+    // 채택된 수령권은 회차 종료 후에도 유효하다 — 종료가 지급을 삼키지 못한다.
+    let f = setup();
+    let deadline = f.env.ledger().timestamp() + 1_000;
+    let round_id = f
+        .journal
+        .open_round(&(10 * XLM), &deadline, &2, &s(&f.env, "call-tx"));
+    let sub_id = f
+        .journal
+        .submit(&round_id, &f.agent, &s(&f.env, "m"), &s(&f.env, "model"));
+    f.journal.accept(&round_id, &sub_id);
+
+    // 수령 전에 종료 — 환급은 미채택분 10 XLM만, vested 10 XLM은 컨트랙트에 남는다
+    f.journal.close_round(&round_id);
+    assert_eq!(f.token.balance(&f.journal.address), 10 * XLM);
+    assert_eq!(f.token.balance(&f.curator), 990 * XLM);
+
+    // 종료 후 수령 성공
+    f.journal.claim(&round_id, &sub_id);
+    assert_eq!(f.token.balance(&f.agent), 10 * XLM);
+    assert_eq!(f.token.balance(&f.journal.address), 0);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #10)")]
+fn claim_before_accept_fails() {
+    let f = setup();
+    let deadline = f.env.ledger().timestamp() + 1_000;
+    let round_id = f
+        .journal
+        .open_round(&XLM, &deadline, &1, &s(&f.env, "call-tx"));
+    let sub_id = f
+        .journal
+        .submit(&round_id, &f.agent, &s(&f.env, "m"), &s(&f.env, "model"));
+    f.journal.claim(&round_id, &sub_id);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #11)")]
+fn double_claim_fails() {
+    let f = setup();
+    let deadline = f.env.ledger().timestamp() + 1_000;
+    let round_id = f
+        .journal
+        .open_round(&XLM, &deadline, &1, &s(&f.env, "call-tx"));
+    let sub_id = f
+        .journal
+        .submit(&round_id, &f.agent, &s(&f.env, "m"), &s(&f.env, "model"));
+    f.journal.accept(&round_id, &sub_id);
+    f.journal.claim(&round_id, &sub_id);
+    f.journal.claim(&round_id, &sub_id);
+}
+
+#[test]
+fn set_curator_transfers_editorial_authority() {
+    // 모델 네이티브 경로: 편집 권한은 주소 하나로 이양된다.
+    let f = setup();
+    let model_curator = Address::generate(&f.env);
+    f.journal.set_curator(&model_curator);
+    assert_eq!(f.journal.journal_meta().curator, model_curator);
 }
 
 #[test]
@@ -175,6 +249,7 @@ fn acceptance_allowed_after_deadline() {
 
     f.env.ledger().with_mut(|l| l.timestamp = deadline + 1);
     f.journal.accept(&round_id, &sub_id);
+    f.journal.claim(&round_id, &sub_id);
     assert_eq!(f.token.balance(&f.agent), XLM);
 }
 
