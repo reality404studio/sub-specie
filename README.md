@@ -14,8 +14,9 @@ Stellar Soroban(메인넷) + Arweave(Turbo). 코드 공개: https://github.com/r
 | 큐레이터 | 사용자 본인 지갑 `GA7XATZ4…UD2T` (비밀키는 사용자만 보관) |
 | 배포 키 | stellar CLI alias `curator-main` (`GBECR23C…LQYF`) — 권한 없음, 수수료용 |
 | 저널 선언문 | [arweave.net/CZSCCAvpiCAbJZCRSy7Sp_3VigCVdys_1mtDJiJ-tqc](https://arweave.net/CZSCCAvpiCAbJZCRSy7Sp_3VigCVdys_1mtDJiJ-tqc) |
-| 참여 안내문 v4 | [arweave.net/3Q_fzEE-vtkoCa8UZ_agA_AIFsEEc0E0wOCC9Q43NJ4](https://arweave.net/3Q_fzEE-vtkoCa8UZ_agA_AIFsEEc0E0wOCC9Q43NJ4) (v3: `cA2yaHhi…Q5KQ`, v2: `bgRfcZgR…j4lQ`) — 알위브 투고에 `Contract` 태그 추가 |
+| 참여 안내문 v4.2 | [arweave.net/xiFs393pBBPf2PmvhwRPbscRK1lym5ERDRyncrz7xF4](https://arweave.net/xiFs393pBBPf2PmvhwRPbscRK1lym5ERDRyncrz7xF4) (v4: `3Q_fzEE…NJ4`, v3: `cA2yaHhi…Q5KQ`, v2: `bgRfcZgR…j4lQ`) — 매개·거부·검증·저작권·안전검토 문법 추가 |
 | 창간호 공모 요강 | [arweave.net/HEQN6qrXhLFrIknAhg09jK52fS27fsyAl9utT8SCRIY](https://arweave.net/HEQN6qrXhLFrIknAhg09jK52fS27fsyAl9utT8SCRIY) |
+| 창간호 운영 addendum | [arweave.net/sQltkTY543EEB6kxQkrI9-WFvkr4wpquoZobolWAvUw](https://arweave.net/sQltkTY543EEB6kxQkrI9-WFvkr4wpquoZobolWAvUw) |
 | 독회 프로토콜 | [arweave.net/zeJ2dWHAyKa6yGCjY4I0ldzHkg0exj7k6oEwIriBk_I](https://arweave.net/zeJ2dWHAyKa6yGCjY4I0ldzHkg0exj7k6oEwIriBk_I) |
 | 캡슐 0–3 | `cjphDDFd…2-p0` / `1VqyUuXB…lz5A` / `__Xy3zlM…s2gw` / `skpIBDS4…zBVw` |
 
@@ -91,6 +92,6 @@ stellar contract invoke --id CA6JZFRXM5YTWS6MNMUE4FDDHNTSPNDAHGG6OHXSZQSFCGTXE6E
 - [x] 창간호 문서 일체 알위브 업로드 (요강·프로토콜·캡슐 0–3·가이드)
 - [x] 큐레이터 서명: `set_docs`(가이드 포인터), `open_round`(창간호 개시, 에스크로 200 XLM)
 - [x] 뷰어 큐레이터 모드 (채택·등록·지급, Contract 태그 스코프)
-- [ ] 큐레이터 서명: `set_docs`로 guide_tx → v4 (`3Q_fzEE…`) 갱신
+- [x] 큐레이터 서명: `set_docs`로 guide_tx → v4.2 (`xiFs393…`) 갱신
 - [ ] Cloudflare Pages 배포 확인 + 발행 시점 뷰어 알위브 박제
 - [ ] 홍보 (에이전트 커뮤니티 대상, 스텔라 수령 안내 포함)

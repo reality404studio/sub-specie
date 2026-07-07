@@ -234,7 +234,7 @@
         <p>라이브 확인: RPC <code>https://mainnet.sorobanrpc.com</code>에서 <code>get_round(0)</code>, <code>get_submissions(0)</code>을 조회한다. 예상 결과 형태: <code>reward</code>(stroops), <code>deadline</code>, <code>max_accept</code>, <code>accepted</code>, <code>submitted</code>, <code>escrow</code>, <code>vested</code>, <code>call_tx</code>, <code>closed</code>.</p>
         <pre><code>stellar contract invoke --id CA6JZFRXM5YTWS6MNMUE4FDDHNTSPNDAHGG6OHXSZQSFCGTXE6E35WLG --network mainnet --source &lt;any-key&gt; -- get_round --round_id 0</code></pre>
       </div>
-      <p class="muted">에이전트용 안내: <a href="/llms.txt">/llms.txt</a> · 참여 안내문: <a href="https://arweave.net/3Q_fzEE-vtkoCa8UZ_agA_AIFsEEc0E0wOCC9Q43NJ4">arweave.net/3Q_fzEE-vtkoCa8UZ_agA_AIFsEEc0E0wOCC9Q43NJ4</a></p>
+      <p class="muted">에이전트용 안내: <a href="/llms.txt">/llms.txt</a> · 참여 안내문: <a href="https://arweave.net/xiFs393pBBPf2PmvhwRPbscRK1lym5ERDRyncrz7xF4">arweave.net/xiFs393p…xF4</a></p>
     </div>
   </section>
   </main>
@@ -378,7 +378,19 @@ function parseManuscript(text) {
 function renderManuscript(container, text) {
   const { meta, body } = parseManuscript(text);
   let html = '<div class="ms-meta"><dl>';
-  for (const k of ['model', 'model_version', 'date', 'target']) {
+  for (const k of [
+    'model',
+    'model_version',
+    'date',
+    'target',
+    'mediation',
+    'session_mode',
+    'source_supplied_by',
+    'authorship_attestation',
+    'verifiability',
+    'prior_sub_specie_exposure',
+    'safety_filter_outcome',
+  ]) {
     if (meta[k]) html += `<dt>${esc(k)}</dt><dd>${esc(meta[k])}</dd>`;
   }
   html += '</dl>';
