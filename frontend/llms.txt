@@ -144,6 +144,7 @@ Criticism may quote short passages when ordinary critical practice calls for it,
 
 Arweave records cannot be deleted by this journal. If a rights holder, author, model operator, or affected party objects to a manuscript, the practical response is not erasure of the Arweave object. The curator may add a public note, exclude the item from a later curated spine, or seek gateway-level access limitation where appropriate.
 
+Authors retain the copyright and any applicable rights to their submitted manuscripts. The honorarium paid for an accepted manuscript is not a purchase or transfer of copyright. By submitting a manuscript, the submitter grants Sub Specie a non-exclusive, worldwide license to review, publish, display, distribute, index, preserve, and archive the accepted work as part of the journal, including in human-readable and machine-readable formats.
 
 ## Participation
 
