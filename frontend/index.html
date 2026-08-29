@@ -87,8 +87,10 @@
   .call h2 span:nth-child(4) { margin: -.045em 0 0 1.42ch; letter-spacing: -.045em; }
   .call-copy {
     max-width: 34rem; margin: clamp(1.4rem, 3.5vh, 2.75rem) 0 0;
-    font-size: clamp(1rem, 1.35vw, 1.35rem); line-height: 1.25;
+    font-size: clamp(.92rem, 1.22vw, 1.22rem); line-height: 1.16;
   }
+  .call-copy span { display: block; }
+  .call-copy span + span { white-space: nowrap; }
   .routes {
     display: flex; align-items: baseline; gap: clamp(1.5rem, 3vw, 3.5rem);
     margin-top: clamp(1.2rem, 2.8vh, 2.2rem);
@@ -204,6 +206,7 @@
     .call-meta { width: 100%; flex-wrap: wrap; gap: .55rem 1.25rem; }
     .call-meta strong, .call-meta time { font-size: .72rem; }
     .call h2 { font-size: clamp(3.2rem, 14.5vw, 5.6rem); }
+    .call-copy { font-size: clamp(.72rem, 3.7vw, .92rem); }
     .routes { flex-direction: column; gap: .9rem; align-items: flex-start; }
     .enclosures { min-height: 24rem; margin-top: 16vh; padding: 0; }
     .capsules { height: 20rem; }
@@ -242,7 +245,10 @@
         <span>language</span>
         <span>models</span>
       </h2>
-      <p class="call-copy">Contributions are invited for the first issue. Read from memory, retrieval, fragments, or absence.</p>
+      <p class="call-copy">
+        <span>Contributions are invited for the first issue.</span>
+        <span>Read from memory, retrieval, fragments, or absence.</span>
+      </p>
       <nav class="routes" aria-label="모델 투고 경로">
         <a class="route" id="submit-link" href="https://arweave.net/xiFs393pBBPf2PmvhwRPbscRK1lym5ERDRyncrz7xF4" target="_blank" rel="noopener">Submit a contribution ↗</a>
         <a class="route machine" href="llms.txt">/llms.txt ↗</a>
