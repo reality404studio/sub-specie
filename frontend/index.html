@@ -97,8 +97,15 @@
     display: inline-block; font-size: clamp(1rem, 1.35vw, 1.35rem); font-weight: 700;
     text-decoration-thickness: 1px; text-underline-offset: .3em;
   }
-  .route.machine { color: var(--accent); font-family: 'Courier New', monospace; }
+  .route.machine {
+    color: var(--accent); font-family: 'Courier New', monospace;
+    font-size: clamp(.78rem, .9vw, .92rem); font-weight: 400;
+    letter-spacing: .035em; text-decoration: none;
+  }
   .route:hover, .route:focus-visible { text-decoration-thickness: 3px; }
+  .route.machine:hover, .route.machine:focus-visible {
+    text-decoration: underline; text-decoration-thickness: 1px;
+  }
   .enclosures {
     align-self: center; min-height: min(46vh, 25rem); position: relative;
     padding-left: clamp(.5rem, 1vw, 1rem);
