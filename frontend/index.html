@@ -109,17 +109,18 @@
   }
   .capsules { position: relative; height: min(39vh, 21rem); }
   .capsule {
-    position: absolute; display: inline-block; width: max-content; padding: 0;
-    background: transparent; color: var(--ink-soft); transform: rotate(-14deg);
-    transform-origin: left center; font-size: clamp(.68rem, .74vw, .76rem);
-    line-height: 1.15; text-decoration: none; text-transform: uppercase;
-    letter-spacing: .05em; white-space: nowrap;
+    position: absolute; display: inline-block; width: 1.4rem; padding: 0;
+    background: transparent; color: var(--ink-soft); writing-mode: vertical-rl;
+    text-orientation: mixed; transform: rotate(14deg); transform-origin: top center;
+    font-size: clamp(.68rem, .74vw, .76rem); line-height: 1.15;
+    text-decoration: none; text-transform: uppercase; letter-spacing: .05em;
+    white-space: nowrap;
   }
-  .capsule::before { content: attr(data-number); margin-right: .55em; }
-  .capsule:nth-child(1) { top: 14%; left: 2%; }
-  .capsule:nth-child(2) { top: 34%; left: 18%; }
-  .capsule:nth-child(3) { top: 54%; left: 7%; }
-  .capsule:nth-child(4) { top: 74%; left: 25%; }
+  .capsule::before { content: attr(data-number); margin-bottom: .55em; }
+  .capsule:nth-child(1) { top: 8%; left: 3%; }
+  .capsule:nth-child(2) { top: 25%; left: 25%; }
+  .capsule:nth-child(3) { top: 42%; left: 47%; }
+  .capsule:nth-child(4) { top: 59%; left: 69%; }
   .capsule:hover, .capsule:focus-visible { color: var(--ink); text-decoration: underline; z-index: 2; }
   .sheet-foot {
     display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 1.5rem;
@@ -199,10 +200,10 @@
     .routes { flex-direction: column; gap: .9rem; align-items: flex-start; }
     .enclosures { min-height: 24rem; margin-top: 16vh; padding: 0; }
     .capsules { height: 20rem; }
-    .capsule:nth-child(1) { top: 10%; left: 2%; }
-    .capsule:nth-child(2) { top: 31%; left: 19%; }
-    .capsule:nth-child(3) { top: 52%; left: 7%; }
-    .capsule:nth-child(4) { top: 73%; left: 26%; }
+    .capsule:nth-child(1) { top: 8%; left: 7%; }
+    .capsule:nth-child(2) { top: 25%; left: 26%; }
+    .capsule:nth-child(3) { top: 42%; left: 50%; }
+    .capsule:nth-child(4) { top: 59%; left: 72%; }
     .sheet-foot { grid-template-columns: 1fr auto; row-gap: 1rem; }
     .chain-link { display: none; }
     .curator-shell[open] { grid-column: 1 / -1; }
