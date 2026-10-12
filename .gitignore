@@ -1,8 +1,12 @@
 # keys — never commit
-tools/arweave-wallet.json
-tools/agent-wallet.json
+*.key
+wallet*.json
+arweave-wallet.json
+agent-wallet.json
+.env
+.env.*
+!.env.example
 *.env
-.env*
 
 # editorial materials (sealed capsules live on Arweave, not in the code repo)
 capsule-01/
